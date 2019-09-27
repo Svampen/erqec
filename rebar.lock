@@ -1,0 +1,18 @@
+{"1.1.0",
+[{<<"esockd">>,
+  {git,"git@github.com:emqx/esockd.git",
+       {ref,"e003f32741fce17c8ddd3b17f797e4274636deef"}},
+  0},
+ {<<"getopt">>,
+  {git,"https://github.com/emqx/getopt.git",
+       {ref,"215f2083408e1fe562d441aea6062bf5d9e1fb67"}},
+  1},
+ {<<"goldrush">>,{pkg,<<"goldrush">>,<<"0.1.9">>},1},
+ {<<"lager">>,
+  {git,"git@github.com:erlang-lager/lager.git",
+       {ref,"1c0ab772df0535d46a4467857954ee4dcf7f3078"}},
+  0}]}.
+[
+{pkg_hash,[
+ {<<"goldrush">>, <<"F06E5D5F1277DA5C413E84D5A2924174182FB108DABB39D5EC548B27424CD106">>}]}
+].
