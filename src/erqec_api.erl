@@ -9,7 +9,8 @@
 -module(erqec_api).
 
 %% API
--export([add_rq/1, add_rq/2]).
+-export([add_rq/1, add_rq/2,
+         match_entry/1]).
 
 -type connectoptions() :: #{ip => iodata(), port => integer(),
                             options => ssl:tls_option(), timeout => integer()}.
@@ -33,19 +34,56 @@ add_rq(RQ, Labels) ->
     AddRQRequest = erqec_pb_lib:build_rq_request(RQ, Labels),
     case erqec_pb_lib:encode_request_message(AddRQRequest) of
         {ok, RequestMessage} ->
-            %% Send to server
             ConnectOptions = #{ip => "localhost", port => 8322,
                                options => [{mode, binary}],
-                               timeout => 1000},
-            case send_message(RequestMessage, ConnectOptions) of
-                {ok, Data} ->
-                    case erqec_pb_lib:decode_response_message(Data) of
-                        {ok, ResponseMessage} ->
-                            parse_response_message(ResponseMessage,
-                                                   add_rq_response);
-                        nok ->
-                            nok
-                    end;
+                               timeout => 2000},
+            send_receive_message(RequestMessage, add_rq_response,
+                                 ConnectOptions);
+        nok ->
+            nok
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Match Entry
+%% @end
+%%--------------------------------------------------------------------
+-spec match_entry(Entry ::
+                    #{iodata() := rqe_pb:'MatchEntryRequest.EntryValue'()}) ->
+                         {ok, [rqe_pb:'RQ'()]} | nok.
+match_entry(Entry) when is_map(Entry) ->
+    MatchEntryRequest = erqec_pb_lib:build_match_entry_request(Entry, 1000),
+    case erqec_pb_lib:encode_request_message(MatchEntryRequest) of
+        {ok, RequestMessage} ->
+            ConnectOptions = #{ip => "localhost", port => 8322,
+                               options => [{mode, binary}],
+                               timeout => 2000},
+            send_receive_message(RequestMessage, match_entry_response,
+                                 ConnectOptions);
+        nok ->
+            nok
+    end.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Send and receive message
+%% @end
+%%--------------------------------------------------------------------
+-spec send_receive_message(RequestMessage :: binary(),
+                           ResponseMessageType :: atom(),
+                           ConnectOptions :: connectoptions()) ->
+                                  nok | term().
+send_receive_message(RequestMessage, ResponseMessageType, ConnectOptions) ->
+    case send_message(RequestMessage, ConnectOptions) of
+        {ok, Data} ->
+            case erqec_pb_lib:decode_response_message(Data) of
+                {ok, #{msg := {ResponseMessageType, _}}=Response} ->
+                    parse_response_message(Response);
+                {ok, ResponseMessage} ->
+                    lager:warning("Unsupported response message "
+                                  "received: ~p",
+                                  [ResponseMessage]),
+                    nok;
                 nok ->
                     nok
             end;
@@ -112,10 +150,12 @@ receive_loop(Socket, Timeout) ->
             nok;
         Unknown ->
             lager:error("Received unknown message:~p", [Unknown]),
+            ssl:close(Socket),
             nok
     after Timeout ->
             lager:warning("Socket ~p timedout after ~p",
                           [Socket, Timeout]),
+            ssl:close(Socket),
             nok
     end.
 
@@ -146,33 +186,46 @@ connect(#{ip := IP, port := Port,
 %% Parse Response Message
 %% @end
 %%--------------------------------------------------------------------
--spec parse_response_message(ResponseMessage :: rqe_pb:'Response'(),
-                             ResponseMessageType :: atom()) ->
+-spec parse_response_message(ResponseMessage :: rqe_pb:'Response'()) ->
                                     term().
-parse_response_message(#{msg := {ResponseMessageType, _}}=ResponseMessage,
-                       ResponseMessageType) ->
-    parse_response_message(ResponseMessage);
-parse_response_message({ResponseMessageType1, _},
-                       ResponseMessageType2) ->
-    lager:warning("Mismatch with received response message type ~p and "
-                  "expected response message type ~p",
-                  [ResponseMessageType1, ResponseMessageType2]),
-    nok.
+parse_response_message(
+  #{msg := {_, #{response_status := #{status := 'NOK',
+                                      reason := Reason}}}}=ResponseMessage) ->
+    lager:warning("NOK status in ~p with reason:~p", [ResponseMessage,
+                                                      Reason]),
+    nok;
+parse_response_message(
+  #{msg := {ResponseMessageType,
+            #{response_status :=
+                  #{status := 'OK'}}=Response}}=ResponseMessage) ->
+    case ResponseMessageType of
+        add_rq_response ->
+            parse_add_rq_response(Response);
+        match_entry_response ->
+            parse_match_entry_response(Response);
+        ResponseMessageType ->
+            lager:warning("Unsupported Response Message received "
+                          "for parsing: ~p",
+                          [ResponseMessage]),
+            nok
+    end.
 
+%%--------------------------------------------------------------------
+%% @doc
+%% Parse add rq response
+%% @end
+%%--------------------------------------------------------------------
+-spec parse_add_rq_response(#{uuid => uuid:uuid()}) -> {ok, uuid:uuid()}.
+parse_add_rq_response(#{uuid := UUID}) ->
+    {ok, UUID}.
 
--spec parse_response_message(rqe_pb:'Response'()) -> term().
-parse_response_message(#{msg := {add_rq_response,
-                                 #{response_status :=
-                                       #{status := 'NOK',
-                                         reason := Reason}}}}) ->
-    lager:warning("NOK status in add_rq_response with reason:~p", [Reason]),
-    {nok, Reason};
-parse_response_message(#{msg := {add_rq_response,
-                                 #{response_status :=
-                                       #{status := 'OK'},
-                                   uuid := UUID}}}) ->
-    {ok, UUID};
-parse_response_message(ResponseMessage) ->
-    lager:warning("Unsupported Response Message received for parsing: ~p",
-                  [ResponseMessage]),
-    nok.
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+
+-spec parse_match_entry_response(#{rqs => RQs :: [rqe_pb:'RQ'()]}) ->
+                                        {ok, [rqe_pb:'RQ'()]}.
+parse_match_entry_response(#{rqs := RQs}) ->
+    {ok, RQs}.

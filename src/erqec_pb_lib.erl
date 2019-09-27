@@ -11,7 +11,8 @@
 %% API
 -export([encode_request_message/1,
          decode_response_message/1,
-         build_rq_request/2]).
+         build_rq_request/2,
+         build_match_entry_request/2]).
 
 %%%===================================================================
 %%% API
@@ -73,6 +74,20 @@ build_rq_request(RQ, Labels) ->
     #{msg => {add_rq_request,
               #{rq => #{rq_items => RQ},
                 labels => #{labels => Labels}}}}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+-spec build_match_entry_request(
+        Entry :: #{iodata() := rqe_pb:'MatchEntryRequest.EntryValue'()},
+        Timeout :: integer()) ->
+                                       rqe_pb:'Request'().
+build_match_entry_request(Entry, Timeout) ->
+    #{msg => {match_entry_request,
+              #{entry => Entry,
+                timeout => Timeout}}}.
 
 %%%===================================================================
 %%% Internal functions
