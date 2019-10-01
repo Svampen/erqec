@@ -15,6 +15,16 @@
 %%====================================================================
 
 start(_StartType, _StartArgs) ->
+    application:load(grpcbox),
+    {ok, #{channel := Channel,
+           protocol := Protocol,
+           ip := IP,
+           port := Port}} = application:get_env(erqec, grpc),
+    application:set_env(grpcbox, client,
+                        #{channels => [{Channel,
+                                        [{Protocol, IP, Port, []}],
+                                        #{}}]}),
+    {ok, _} = application:ensure_all_started(grpcbox),
     erqec_sup:start_link().
 
 %%--------------------------------------------------------------------
