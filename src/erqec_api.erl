@@ -68,6 +68,10 @@ grpc(Request, Channel) ->
     case rqe_service_client:rqe_message(ctx:new(), Request, ChannelOption) of
         {ok, ResponseMessage, _Headers} ->
              parse_response_message(ResponseMessage);
+        {error, Error} ->
+            lager:error("Received error in grpc:~p",
+                        [Error]),
+            {nok, error};
         {grpc_error, {ErrorCode, ErrorMessage}} ->
             lager:error("Recieved grpc error ~p:~p",
                         [ErrorCode, ErrorMessage]),
