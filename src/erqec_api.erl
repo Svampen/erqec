@@ -9,8 +9,8 @@
 -module(erqec_api).
 
 %% API
--export([add_rq/1, add_rq/2,
-         match_entry/1]).
+-export([add_rq/1, add_rq/2, add_rq/3,
+         match_entry/1, match_entry/2]).
 
 %%%===================================================================
 %%% API
@@ -28,20 +28,32 @@ add_rq(RQ) ->
 -spec add_rq(RQ :: [rqe_pb:rq_item()], Labels :: [rqe_pb:rq_label()]) ->
                     {ok, uuid:uuid()} | {nok, Error :: term()}.
 add_rq(RQ, Labels) ->
+    add_rq(RQ, Labels, default_channel).
+
+-spec add_rq(RQ :: [rqe_pb:rq_item()],
+             Labels :: [rqe_pb:rq_label()],
+             Channel :: atom()) ->
+                    {ok, uuid:uuid()} | {nok, Error :: term()}.
+add_rq(RQ, Labels, Channel) ->
     AddRQRequest = erqec_pb_lib:build_rq_request(RQ, Labels),
-    grpc(AddRQRequest).
+    grpc(AddRQRequest, Channel).
 
 %%--------------------------------------------------------------------
 %% @doc
 %% Match Entry
 %% @end
 %%--------------------------------------------------------------------
--spec match_entry(Entry ::
-                    #{iodata() := rqe_pb:entry_value()}) ->
+-spec match_entry(Entry :: #{iodata() := rqe_pb:entry_value()}) ->
                          {ok, [rqe_pb:rq()]} | nok.
 match_entry(Entry) when is_map(Entry) ->
+    match_entry(Entry, default_channel).
+
+-spec match_entry(Entry :: #{iodata() := rqe_pb:entry_value()},
+                  Channel :: atom()) ->
+                         {ok, [rqe_pb:rq()]} | nok.
+match_entry(Entry, Channel) ->
     MatchEntryRequest = erqec_pb_lib:build_match_entry_request(Entry, 1000),
-    grpc(MatchEntryRequest).
+    grpc(MatchEntryRequest, Channel).
 
 %%%===================================================================
 %%% Internal functions
@@ -51,8 +63,9 @@ match_entry(Entry) when is_map(Entry) ->
 %% Handle grpc request and the response
 %% @end
 %%--------------------------------------------------------------------
-grpc(Request) ->
-    case rqe_service_client:rqe_message(Request) of
+grpc(Request, Channel) ->
+    ChannelOption = #{channel => Channel},
+    case rqe_service_client:rqe_message(ctx:new(), Request, ChannelOption) of
         {ok, ResponseMessage, _Headers} ->
              parse_response_message(ResponseMessage);
         {grpc_error, {ErrorCode, ErrorMessage}} ->

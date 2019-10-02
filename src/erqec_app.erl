@@ -23,7 +23,8 @@ start(_StartType, _StartArgs) ->
     application:set_env(grpcbox, client,
                         #{channels => [{Channel,
                                         [{Protocol, IP, Port, []}],
-                                        #{}}]}),
+                                        #{}}
+                                      ]}),
     {ok, _} = application:ensure_all_started(grpcbox),
     erqec_sup:start_link().
 
