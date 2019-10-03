@@ -53,7 +53,7 @@ delete_rq(RQId) ->
                 Channel :: atom()) ->
                        ok | {nok, Error :: term()}.
 delete_rq(RQId, Channel) ->
-    DeleteRQRequest = ereqc_pb_lib:build_delete_rq_request(RQId),
+    DeleteRQRequest = erqec_pb_lib:build_delete_rq_request(RQId),
     grpc(DeleteRQRequest, Channel).
 
 %%--------------------------------------------------------------------
