@@ -10,6 +10,7 @@
 
 %% API
 -export([add_rq/1, add_rq/2, add_rq/3,
+         delete_rq/1, delete_rq/2,
          match_entry/1, match_entry/2]).
 
 %%%===================================================================
@@ -21,7 +22,8 @@
 %% Add RQ
 %% @end
 %%--------------------------------------------------------------------
--spec add_rq(RQ :: [rqe_pb:rq_item()]) -> {ok, uuid:uuid()} | nok.
+-spec add_rq(RQ :: [rqe_pb:rq_item()]) ->
+                    {ok, uuid:uuid()} | {nok, Error :: term()}.
 add_rq(RQ) ->
     add_rq(RQ, []).
 
@@ -37,6 +39,22 @@ add_rq(RQ, Labels) ->
 add_rq(RQ, Labels, Channel) ->
     AddRQRequest = erqec_pb_lib:build_rq_request(RQ, Labels),
     grpc(AddRQRequest, Channel).
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Delete RQ
+%% @end
+%%--------------------------------------------------------------------
+-spec delete_rq(RQId :: uuid:uuid()) -> ok | {nok, Error :: term()}.
+delete_rq(RQId) ->
+    delete_rq(RQId, default_channel).
+
+-spec delete_rq(RQId :: uuid:uuid(),
+                Channel :: atom()) ->
+                       ok | {nok, Error :: term()}.
+delete_rq(RQId, Channel) ->
+    DeleteRQRequest = ereqc_pb_lib:build_delete_rq_request(RQId),
+    grpc(DeleteRQRequest, Channel).
 
 %%--------------------------------------------------------------------
 %% @doc
@@ -90,6 +108,9 @@ parse_response_message(#{msg := {add_rq_response, Response}}) ->
 parse_response_message(#{msg := {match_entry_response, Response}}) ->
     parse_match_entry_response(Response);
 
+parse_response_message(#{msg := {delete_req_response, Response}}) ->
+    parse_delete_rq_response(Response);
+
 parse_response_message(ResponseMessage) ->
     lager:warning("Unsupported Response Message received "
                   "for parsing: ~p",
@@ -115,3 +136,12 @@ parse_add_rq_response(#{uuid := UUID}) ->
                                         {ok, [rqe_pb:rq()]}.
 parse_match_entry_response(#{rqs := RQs}) ->
     {ok, RQs}.
+
+%%--------------------------------------------------------------------
+%% @doc
+%% @spec
+%% @end
+%%--------------------------------------------------------------------
+-spec parse_delete_rq_response(#{}) -> ok.
+parse_delete_rq_response(_) ->
+    ok.
